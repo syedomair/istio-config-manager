@@ -80,25 +80,103 @@ func ApplyConfig(clients *kube.Clients, cfg config.AppConfig) error {
 	return nil
 }
 
+/*
+	func ApplyHeaderOverride(client istioclientset.Interface, cfg config.AppConfig) error {
+		vsClient := client.NetworkingV1alpha3().VirtualServices(cfg.Namespace)
+
+		// Get existing VirtualService
+		vs, err := vsClient.Get(context.Background(), cfg.VirtualServiceName, metaV1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get VirtualService: %v", err)
+		}
+
+		log.Println("Original VirtualService fetched. Updating match rules...")
+
+		// Add or override match rule to route only requests with header x-user-type: beta
+		newMatch := &networkingv1beta1.HTTPMatchRequest{
+			Headers: map[string]*networkingv1beta1.StringMatch{
+				"x-user-type": {MatchType: &networkingv1beta1.StringMatch_Exact{Exact: "beta"}},
+			},
+			Uri: &networkingv1beta1.StringMatch{
+				MatchType: &networkingv1beta1.StringMatch_Prefix{
+					Prefix: "/user/users",
+				},
+			},
+		}
+
+		newRoute := networkingv1beta1.HTTPRoute{
+			Match: []*networkingv1beta1.HTTPMatchRequest{newMatch},
+			Rewrite: &networkingv1beta1.HTTPRewrite{
+				Uri: "/v2/users"},
+			Route: []*networkingv1beta1.HTTPRouteDestination{
+				{
+					Destination: &networkingv1beta1.Destination{
+						Host:   cfg.Host,
+						Subset: cfg.SubsetName, // e.g., v2
+					},
+				},
+			},
+		}
+
+		// Prepend new match rule to HTTP routes (so it takes priority)
+		vs.Spec.Http = append([]*networkingv1beta1.HTTPRoute{&newRoute}, vs.Spec.Http...)
+
+		// Apply the updated VirtualService
+		_, err = vsClient.Update(context.Background(), vs, metaV1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update VirtualService: %v", err)
+		}
+
+		log.Printf("Updated VirtualService %s with new header-based routing\n", cfg.VirtualServiceName)
+		return nil
+	}
+*/
 func ApplyHeaderOverride(client istioclientset.Interface, cfg config.AppConfig) error {
 	vsClient := client.NetworkingV1alpha3().VirtualServices(cfg.Namespace)
 
-	// Get existing VirtualService
 	vs, err := vsClient.Get(context.Background(), cfg.VirtualServiceName, metaV1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get VirtualService: %v", err)
 	}
 
-	log.Println("Original VirtualService fetched. Updating match rules...")
+	log.Println("Original VirtualService fetched. Checking for existing header+URI match...")
 
-	// Add or override match rule to route only requests with header x-user-type: beta
+	targetHeader := "x-user-type"
+	targetValue := "beta1"
+	targetPrefix := "/user/users"
+	targetRewrite := "/v2/users"
+	targetSubset := cfg.SubsetName // e.g., v2
+
+	// Check if an identical match+rewrite+route already exists
+	for _, httpRoute := range vs.Spec.Http {
+		// Check each match
+		for _, match := range httpRoute.Match {
+			hdr, hdrOk := match.Headers[targetHeader]
+			uri := match.Uri.GetPrefix()
+			if hdrOk && hdr.GetExact() == targetValue && uri == targetPrefix {
+				// Match exists, now check rewrite and destination
+				if httpRoute.Rewrite != nil && httpRoute.Rewrite.Uri == targetRewrite {
+					for _, r := range httpRoute.Route {
+						if r.Destination != nil && r.Destination.Host == cfg.Host && r.Destination.Subset == targetSubset {
+							log.Println("Matching header-based route already exists. Skipping update.")
+							return nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	log.Println("No matching route found. Adding new header-based route.")
+
+	// Define new route
 	newMatch := &networkingv1beta1.HTTPMatchRequest{
 		Headers: map[string]*networkingv1beta1.StringMatch{
-			"x-user-type": {MatchType: &networkingv1beta1.StringMatch_Exact{Exact: "beta"}},
+			targetHeader: {MatchType: &networkingv1beta1.StringMatch_Exact{Exact: targetValue}},
 		},
 		Uri: &networkingv1beta1.StringMatch{
 			MatchType: &networkingv1beta1.StringMatch_Prefix{
-				Prefix: "/user/users",
+				Prefix: targetPrefix,
 			},
 		},
 	}
@@ -106,26 +184,69 @@ func ApplyHeaderOverride(client istioclientset.Interface, cfg config.AppConfig) 
 	newRoute := networkingv1beta1.HTTPRoute{
 		Match: []*networkingv1beta1.HTTPMatchRequest{newMatch},
 		Rewrite: &networkingv1beta1.HTTPRewrite{
-			Uri: "/v2/users"},
+			Uri: targetRewrite,
+		},
 		Route: []*networkingv1beta1.HTTPRouteDestination{
 			{
 				Destination: &networkingv1beta1.Destination{
 					Host:   cfg.Host,
-					Subset: cfg.SubsetName, // e.g., v2
+					Subset: targetSubset,
 				},
 			},
 		},
 	}
 
-	// Prepend new match rule to HTTP routes (so it takes priority)
+	// Prepend the new route (higher priority)
 	vs.Spec.Http = append([]*networkingv1beta1.HTTPRoute{&newRoute}, vs.Spec.Http...)
 
-	// Apply the updated VirtualService
 	_, err = vsClient.Update(context.Background(), vs, metaV1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update VirtualService: %v", err)
 	}
 
-	log.Printf("Updated VirtualService %s with new header-based routing\n", cfg.VirtualServiceName)
+	log.Printf("VirtualService %s updated with header-based routing.\n", cfg.VirtualServiceName)
+	return nil
+}
+
+func ApplyTrafficSplit(client istioclientset.Interface, cfg config.AppConfig, v1Weight, v2Weight int32) error {
+	vsClient := client.NetworkingV1alpha3().VirtualServices(cfg.Namespace)
+
+	vs, err := vsClient.Get(context.Background(), cfg.VirtualServiceName, metaV1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get VirtualService: %v", err)
+	}
+
+	log.Println("Original VirtualService fetched. Applying A/B traffic split...")
+
+	// Define weighted routing
+	splitRoute := &networkingv1beta1.HTTPRoute{
+		Route: []*networkingv1beta1.HTTPRouteDestination{
+			{
+				Destination: &networkingv1beta1.Destination{
+					Host:   cfg.Host,
+					Subset: "v1",
+				},
+				Weight: v1Weight,
+			},
+			{
+				Destination: &networkingv1beta1.Destination{
+					Host:   cfg.Host,
+					Subset: "v2",
+				},
+				Weight: v2Weight,
+			},
+		},
+	}
+
+	// Replace entire HTTP block (assumes A/B routing takes priority)
+	vs.Spec.Http = []*networkingv1beta1.HTTPRoute{splitRoute}
+
+	_, err = vsClient.Update(context.Background(), vs, metaV1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update VirtualService with traffic split: %v", err)
+	}
+
+	log.Printf("Updated VirtualService %s with v1:%d%%, v2:%d%% traffic split\n",
+		cfg.VirtualServiceName, v1Weight, v2Weight)
 	return nil
 }
