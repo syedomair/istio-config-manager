@@ -325,60 +325,6 @@ func ApplyRetryPolicy(client istioclientset.Interface, cfg config.AppConfig) err
 	return nil
 }
 
-/*
-func ApplyCircuitBreaker(client istioclientset.Interface, cfg config.AppConfig) error {
-
-		drClient := client.NetworkingV1beta1().DestinationRules(cfg.Namespace)
-
-		maxEjectionPercent := 100
-		maxEjectionPercent32 := int32(maxEjectionPercent)
-		consecutiveGatewayErrors := 1
-		consecutiveGatewayErrors32 := int32(consecutiveGatewayErrors)
-
-		dr := &networkingv1beta1.DestinationRule{
-			Host: cfg.Host,
-			TrafficPolicy: &networkingv1beta1.TrafficPolicy{
-				ConnectionPool: &networkingv1beta1.ConnectionPoolSettings{
-					Tcp: &networkingv1beta1.ConnectionPoolSettings_TCPSettings{
-						MaxConnections: 1,
-					},
-					Http: &networkingv1beta1.ConnectionPoolSettings_HTTPSettings{
-						Http1MaxPendingRequests:  1,
-						MaxRequestsPerConnection: 1,
-					},
-				},
-				OutlierDetection: &networkingv1beta1.OutlierDetection{
-					ConsecutiveGatewayErrors: wrapperspb.UInt32(uint32(consecutiveGatewayErrors32)),
-					Interval:                 prototime("5s"),
-					BaseEjectionTime:         prototime("30s"),
-					MaxEjectionPercent:       maxEjectionPercent32,
-				},
-			},
-		}
-
-
-
-		_, err := drClient.Create(context.Background(), dr, metaV1.CreateOptions{})
-		if err != nil {
-			if k8serrors.IsAlreadyExists(err) {
-				log.Printf("DestinationRule %s already exists. Skipping creation.\n", cfg.Destination)
-				return nil
-			}
-			return fmt.Errorf("failed to create DestinationRule: %v", err)
-		}
-
-		log.Printf("DestinationRule %s created with circuit breaker settings.\n", cfg.Destination)
-		return nil
-	}
-
-	func prototime(duration string) *durationpb.Duration {
-		d, err := time.ParseDuration(duration)
-		if err != nil {
-			return nil
-		}
-		return durationpb.New(d)
-	}
-*/
 func ApplyCircuitBreaker(client istioclientset.Interface, cfg config.AppConfig) error {
 	drClient := client.NetworkingV1beta1().DestinationRules(cfg.Namespace)
 
