@@ -15,6 +15,13 @@ type AppConfig struct {
 	SkipDestinationRule bool
 	HeaderName          string
 	HeaderValue         string
+	TrafficWeight1      string
+	TrafficWeight2      string
+	FaultDelayMillis    string
+	TimeoutDuration     string
+	RetryAttempt        string
+	RetryPerTryTimeout  string
+	RetryOn             string
 }
 
 func LoadConfig() AppConfig {
@@ -28,6 +35,13 @@ func LoadConfig() AppConfig {
 		SkipDestinationRule: getEnvBool("SKIP_DESTINATION_RULE", true),
 		HeaderName:          getEnv("HEADER_NAME", "x-user-type"),
 		HeaderValue:         getEnv("HEADER_VALUE", "beta"),
+		TrafficWeight1:      getEnv("WEIGHT_V1", "90"),
+		TrafficWeight2:      getEnv("WEIGHT_V2", "10"),
+		FaultDelayMillis:    getEnv("FAULT_DELAY_MILLIS", "5000"),
+		TimeoutDuration:     getEnv("TIMEOUT_DURATION", "2"),
+		RetryAttempt:        getEnv("RETRY_ATTEMPT", "3"),
+		RetryPerTryTimeout:  getEnv("RETRY_PER_TRY_TIMEOUT", "1"),
+		RetryOn:             getEnv("RETRY_ON", "gateway-error,connect-failure,refused-stream,5xx"),
 	}
 }
 
