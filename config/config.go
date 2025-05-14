@@ -15,6 +15,8 @@ type AppConfig struct {
 	SkipDestinationRule bool
 	HeaderName          string
 	HeaderValue         string
+	TargetPrefix        string
+	TargetRewrite       string
 	TrafficWeight1      string
 	TrafficWeight2      string
 	FaultDelayMillis    string
@@ -35,6 +37,8 @@ func LoadConfig() AppConfig {
 		SkipDestinationRule: getEnvBool("SKIP_DESTINATION_RULE", true),
 		HeaderName:          getEnv("HEADER_NAME", "x-user-type"),
 		HeaderValue:         getEnv("HEADER_VALUE", "beta"),
+		TargetPrefix:        getEnv("TARGET_PREFIX", "/user/users"),
+		TargetRewrite:       getEnv("TARGET_REWRITE", "/v2/users"),
 		TrafficWeight1:      getEnv("WEIGHT_V1", "90"),
 		TrafficWeight2:      getEnv("WEIGHT_V2", "10"),
 		FaultDelayMillis:    getEnv("FAULT_DELAY_MILLIS", "5000"),
