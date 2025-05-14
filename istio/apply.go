@@ -28,9 +28,9 @@ func ApplyHeaderOverride(client istioclientset.Interface, cfg config.AppConfig) 
 
 	log.Println("Original VirtualService fetched. Checking for existing header+URI match...")
 
-	targetHeader := "x-user-type"
-	targetValue := "beta1"
-	targetPrefix := "/user/users"
+	targetHeader := cfg.HeaderName
+	targetValue := cfg.HeaderValue
+	targetPrefix := cfg.TargetPrefix
 	targetRewrite := "/v2/users"
 	targetSubset := cfg.SubsetName // e.g., v2
 
