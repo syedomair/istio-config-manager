@@ -26,7 +26,7 @@ This project demonstrates how automation can simplify mesh management and integr
 ## 🏗️ Architecture
 
 
-
+```
 +-------------------------+
 | Environment Variables |
 +-------------------------+
@@ -47,7 +47,7 @@ This project demonstrates how automation can simplify mesh management and integr
 | Cluster VirtualService |
 | & DestinationRule CRDs |
 +-------------------------+
-
+```
 
 ---
 
