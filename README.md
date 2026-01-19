@@ -59,10 +59,10 @@ This project demonstrates how platform teams can treat **service mesh configurat
 +-------------------------+
 ```
 
+---
+
 ## ⚙️ Environment Variables
-
 You can configure your routing setup using the following environment variables:
-
 | Variable Name             | Description                                      |
 |--------------------------|--------------------------------------------------|
 | `NAMESPACE`              | Target Kubernetes namespace                      |
@@ -75,10 +75,9 @@ You can configure your routing setup using the following environment variables:
 
  💡 You can extend this list based on your use case—e.g., adding subsets, retries, timeouts, etc.
 
-```bash
-
 ## 🧪 Example
 
+```bash
 export NAMESPACE=default
 export SERVICE_NAME=user-service
 export HOST=user.example.com
